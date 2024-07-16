@@ -33,14 +33,15 @@ TEE_Result TA_OpenSessionEntryPoint(uint32_t param_types, TEE_Param params[4], v
 	(void)&params;
 	(void)&sess_ctx;
 	IMSG("Bitcoin Wallet\n");
-  memcpy(&node, (void*)NODE_ADDRESS, sizeof(HDNode));
+  memcpy(&node, (void*)NODE_ADDRESS, sizeof(HDNode)); //Different from the original, is used for restore global variable HDNode, used in command functions
+	//maybe remove it from here and move it to the "drive" when specific functions are called
 	return TEE_SUCCESS;
 }
 
 void TA_CloseSessionEntryPoint(void *sess_ctx){
 	(void)&sess_ctx;
 
-  memcpy((void*)NODE_ADDRESS, &node, sizeof(HDNode));
+  memcpy((void*)NODE_ADDRESS, &node, sizeof(HDNode)); //Different from the original, is used for save global variable HDNode, used in command functions
 	IMSG("Goodbye!\n");
 }
 
@@ -87,6 +88,8 @@ static TEE_Result check_masterkey(uint32_t param_types, TEE_Param params[4]){
 	}
 
 	res = btc_check_masterkey(&node);
+	//DIF: "res = TEE_OpenPersistentObject(TEE_STORAGE_PRIVATE, &masterkey_ext_id, sizeof(masterkey_ext_id), flags_read, &obj);"
+	//DIF: fazer com que a call do TEE_OpenPersistentObject chame a btc_check_masterkey
   
 	if(res == 0){
 		params[1].value.a = 1;
@@ -96,6 +99,7 @@ static TEE_Result check_masterkey(uint32_t param_types, TEE_Param params[4]){
 		params[1].value.a = 0;
 		DMSG("Master Key does not exist");
 	}
+	//DIF: TEE_CloseObject(obj);
 
 #ifdef DEBUG_MODE
   DMSG("Public Key: ");
@@ -122,7 +126,9 @@ static TEE_Result generate_new_masterkey(uint32_t param_types, TEE_Param params[
 	uint32_t exp_param_types = TEE_PARAM_TYPES(	TEE_PARAM_TYPE_VALUE_INOUT, 
 												TEE_PARAM_TYPE_MEMREF_OUTPUT, 
 												TEE_PARAM_TYPE_NONE, 
-												TEE_PARAM_TYPE_NONE);
+												TEE_PARAM_TYPE_NONE); //DIF: we also need to make this on the others
+	//DIF: there are some variables missing here: res, obj, strength, mnemonic
+
 	DMSG("has been called");
 
 	// check parameter types
@@ -136,6 +142,7 @@ static TEE_Result generate_new_masterkey(uint32_t param_types, TEE_Param params[
 	
  // Generate a new mnemonic
     const char *new_mnemonic = btc_mnemonic_generate(MNEMONIC_STRENGTH); // 128 bits of entropy for a 12-word mnemonic
+	//DIF: here the function is "res = get_random_mnemonic(strength, mnemonic);"
 
     // Ensure mnemonic generation was successful
     if (new_mnemonic == NULL) {
