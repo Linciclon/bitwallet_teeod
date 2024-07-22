@@ -1,7 +1,13 @@
 #include <stdio.h>
 #include <string.h>
 
+
+#ifdef Bare
+#include <bare_tee_internal_api.h>
+#else
 #include <tee_internal_api.h>
+#endif 
+
 #include <tee_internal_api_extensions.h>
 #include <bitcoin_wallet_ta.h>
 #include <btc.h>
@@ -74,7 +80,15 @@ static TEE_Result check_masterkey(uint32_t param_types, TEE_Param params[4]){
 												TEE_PARAM_TYPE_NONE, 
 												TEE_PARAM_TYPE_NONE);
 	
-	uint32_t res;
+	#ifdef Bare
+		uint32_t res;
+	#else 
+		TEE_Result res;
+	#endif
+
+	TEE_ObjectHandle obj = TEE_HANDLE_NULL;
+	uint32_t flags_read = TEE_DATA_FLAG_ACCESS_READ;
+	uint32_t masterkey_ext_id = TA_OBJECT_MASTERKEY_EXT;
 
 	DMSG("has been called");
 
@@ -87,37 +101,30 @@ static TEE_Result check_masterkey(uint32_t param_types, TEE_Param params[4]){
 		return TEE_SUCCESS;
 	}
 
-	res = btc_check_masterkey(&node);
-	//DIF: "res = TEE_OpenPersistentObject(TEE_STORAGE_PRIVATE, &masterkey_ext_id, sizeof(masterkey_ext_id), flags_read, &obj);"
-	//DIF: fazer com que a call do TEE_OpenPersistentObject chame a btc_check_masterkey
+	//res = btc_check_masterkey(&node);
+	res = TEE_OpenPersistentObject(TEE_STORAGE_PRIVATE, &masterkey_ext_id, sizeof(masterkey_ext_id), flags_read, &obj);
   
-	if(res == 0){
+
+	//if(res == 0){ //res tem de ser TEE_SUCCESS, verificar se da para igualar....verificar se obj da para colocar TEE_HANDLE_NULL differente 
+	//	params[1].value.a = 1;
+	//	DMSG("Master Key exists");
+	//}
+	//else {
+	//	params[1].value.a = 0;
+	//	DMSG("Master Key does not exist");
+	//}
+
+	if(res == TEE_SUCCESS && obj!=TEE_HANDLE_NULL){
 		params[1].value.a = 1;
 		DMSG("Master Key exists");
 	}
-	else {
+	else if(obj == TEE_HANDLE_NULL){
 		params[1].value.a = 0;
 		DMSG("Master Key does not exist");
 	}
-	//DIF: TEE_CloseObject(obj);
 
-#ifdef DEBUG_MODE
-  DMSG("Public Key: ");
-  for(int i=0; i<32; i++){
-    printf("%x", node.public_key[i]);
-  }
-  printf("\r\n");
-  DMSG("Private Key: ");
-  for(int i=0; i<32; i++){
-    printf("%x", node.private_key[i]);
-  }
-  printf("\r\n");
-  DMSG("Chain code: ");
-  for(int i=0; i<32; i++){
-    printf("%x", node.chain_code[i]);
-  }
-  printf("\r\n");
-#endif
+	TEE_CloseObject(obj);
+
 	return TEE_SUCCESS;
 }
 
